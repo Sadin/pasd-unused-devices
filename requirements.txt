@@ -1,4 +1,6 @@
 pandas
+xlrd
 numpy
 pre-commit
 openpyxl
+bs4

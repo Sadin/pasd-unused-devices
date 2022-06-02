@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 
 import pandas as pd
+from bs4 import BeautifulSoup
 
 
 def csvcheck(filename: str) -> bool:
@@ -11,13 +12,32 @@ def csvcheck(filename: str) -> bool:
     return True
 
 
+def convert_to_xlsx(filepath: str) -> str:
+    with open(filepath) as xml_file:
+        filename = 'conditioned_skyward.xlsx'
+        soup = BeautifulSoup(xml_file.read(), 'xml')
+        writer = pd.ExcelWriter(filename)
+        for sheet in soup.findAll('Worksheet'):
+            sheet_as_list = []
+            for row in sheet.findAll('Row'):
+                sheet_as_list.append(
+                    [cell.Data.text if cell.Data
+                        else '' for cell in row.findAll('Cell')])
+            pd.DataFrame(sheet_as_list).to_excel(
+                writer, sheet_name=sheet.attrs['ss:Name'],
+                index=False, header=False)
+
+        writer.save()
+        return filename
+
+
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         raise ValueError(
             'application requires 2 filepaths for input,' +
             'Prime CSV path followed by Intune CSV path.')
 
-    paths = (sys.argv[1].strip(), sys.argv[2].strip())
+    paths = (sys.argv[1].strip(), sys.argv[2].strip(), sys.argv[3].strip())
 
     if not csvcheck(paths[0]) or not csvcheck(paths[1]):
         raise ValueError('One of the files is not a csv')
@@ -27,7 +47,10 @@ if __name__ == '__main__':
     # start import at row index 8
     primeData = pd.read_csv(paths[0], header=8)
     intuneData = pd.read_csv(paths[1])
-    skywardDate = pd.read_csv(paths[2])
+
+    # workaround for bad output data from skyward
+    skywardData = pd.read_excel(convert_to_xlsx(paths[2]))
+
     columnFilter = ['Vendor', 'IP Address', 'AP Name',
                     '802.11 State', 'SSID', 'Profile', 'Protocol',
                     'AP Map Location', 'OS']
@@ -61,7 +84,4 @@ if __name__ == '__main__':
         mergedData['Last Seen'])
     mergedData['Last check-in'] = pd.to_datetime(mergedData['Last check-in'])
 
-    filteredData = mergedData[mergedData['Last check-in']
-                              < mergedData['Last Seen']]
-
-    print(primeData['MAC Address'])
+    print(skywardData)
