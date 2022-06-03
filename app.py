@@ -72,7 +72,7 @@ if __name__ == '__main__':
                     'ProcessorArchitecture', 'EID', 'TPMManufacturerId',
                     'TPMManufacturerVersion', 'Phone number',
                     'ICCID', 'JoinType']
-    skywardFilter = ['']
+    skywardFilter = ['HR #']
 
     # print paths for debug
     print(f'Prime(wireless): {paths[0]}')
@@ -95,9 +95,15 @@ if __name__ == '__main__':
 
     print('Exclude columns from primeData using user-defined filter ...')
     primeData.drop(columns=primeFilter, inplace=True)
+    print(primeData.columns)
 
     print('Exclude columns from intuneData using user-defined filter ...')
     intuneData.drop(columns=intuneFilter, inplace=True)
+    print(intuneData.columns)
+
+    print('Exclude columns from skywardData using user-defined filter ...')
+    skywardData.drop(columns=skywardFilter, inplace=True)
+    print(skywardData.columns)
 
     print('Inner join on MAC Address...')
     # merge dataframes on MAC Address
@@ -114,12 +120,11 @@ if __name__ == '__main__':
     skywardData = skywardData.rename(
         columns={'Serial Number': 'Serial number'})
 
+    print('Join skyward data to AD/Prime exports via service tag ...')
     mergedData = pd.merge(activeComputers, skywardData,
                           on='Serial number', how='left')
 
-    print(intuneData.columns)
-    print(primeData.columns)
-
+    print('Exporting result...')
     # export data
     mergedData.to_excel(
         f'export_{date.today().strftime("%b-%d-%Y")}.xlsx', index=False)
