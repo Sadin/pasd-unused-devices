@@ -128,5 +128,3 @@ if __name__ == '__main__':
     # export data
     mergedData.to_excel(
         f'export_{date.today().strftime("%b-%d-%Y")}.xlsx', index=False)
-
-    # print(skywardData)
