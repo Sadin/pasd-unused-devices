@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import date
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -14,15 +15,18 @@ def csvcheck(filename: str) -> bool:
 
 def convert_to_xlsx(filepath: str) -> str:
     with open(filepath) as xml_file:
+        print('Skyward data incorrect format, parsing to xlsx...')
         filename = 'conditioned_skyward.xlsx'
         soup = BeautifulSoup(xml_file.read(), 'xml')
         writer = pd.ExcelWriter(filename)
         for sheet in soup.findAll('Worksheet'):
+            print('Sheet found...')
             sheet_as_list = []
             for row in sheet.findAll('Row'):
                 sheet_as_list.append(
                     [cell.Data.text if cell.Data
                         else '' for cell in row.findAll('Cell')])
+            print(str(len(sheet_as_list)) + ' rows processed...')
             pd.DataFrame(sheet_as_list).to_excel(
                 writer, sheet_name=sheet.attrs['ss:Name'],
                 index=False, header=False)
@@ -51,9 +55,24 @@ if __name__ == '__main__':
     # workaround for bad output data from skyward
     skywardData = pd.read_excel(convert_to_xlsx(paths[2]))
 
-    columnFilter = ['Vendor', 'IP Address', 'AP Name',
-                    '802.11 State', 'SSID', 'Profile', 'Protocol',
-                    'AP Map Location', 'OS']
+    primeFilter = ['Vendor', 'IP Address', 'AP Name',
+                   '802.11 State', 'SSID', 'Profile', 'Protocol',
+                   'AP Map Location']
+    intuneFilter = ['Enrollment date', 'EAS activation ID',
+                    'Azure AD Device ID', 'Manufacturer',
+                    'EAS activated', 'IMEI', 'Last EAS sync time',
+                    'EAS reason', 'EAS status',
+                    'Compliance grace period expiration',
+                    'Security patch level', 'MEID', 'Subscriber carrier',
+                    'Total storage', 'Free storage', 'Management name',
+                    'Category', 'UserId', 'Primary user UPN',
+                    'Primary user email address', 'Primary user display name',
+                    'Managed by', 'Ownership', 'Device state', 'Supervised',
+                    'Encrypted', 'OS', 'SkuFamily', 'CellularTechnology',
+                    'ProcessorArchitecture', 'EID', 'TPMManufacturerId',
+                    'TPMManufacturerVersion', 'Phone number',
+                    'ICCID', 'JoinType']
+    skywardFilter = ['']
 
     # print paths for debug
     print(f'Prime(wireless): {paths[0]}')
@@ -74,14 +93,35 @@ if __name__ == '__main__':
     # rename intuneData MAC Address column to match for merge
     intuneData = intuneData.rename(columns={'Wi-Fi MAC': 'MAC Address'})
 
+    print('Exclude columns from primeData using user-defined filter ...')
+    primeData.drop(columns=primeFilter, inplace=True)
+
+    print('Exclude columns from intuneData using user-defined filter ...')
+    intuneData.drop(columns=intuneFilter, inplace=True)
+
     print('Inner join on MAC Address...')
     # merge dataframes on MAC Address
-    mergedData = pd.merge(primeData, intuneData,
-                          on='MAC Address').drop(columns=columnFilter)
+    activeComputers = pd.merge(primeData, intuneData,
+                               on='MAC Address')
 
-    mergedData = mergedData.sort_values('Last check-in')
-    mergedData['Last Seen'] = pd.to_datetime(
-        mergedData['Last Seen'])
-    mergedData['Last check-in'] = pd.to_datetime(mergedData['Last check-in'])
+    activeComputers = activeComputers.sort_values('Last check-in')
+    activeComputers['Last Seen'] = pd.to_datetime(
+        activeComputers['Last Seen'])
+    activeComputers['Last check-in'] = pd.to_datetime(
+        activeComputers['Last check-in'])
 
-    print(skywardData)
+    # rename skyward column for merge
+    skywardData = skywardData.rename(
+        columns={'Serial Number': 'Serial number'})
+
+    mergedData = pd.merge(activeComputers, skywardData,
+                          on='Serial number', how='left')
+
+    print(intuneData.columns)
+    print(primeData.columns)
+
+    # export data
+    mergedData.to_excel(
+        f'export_{date.today().strftime("%b-%d-%Y")}.xlsx', index=False)
+
+    # print(skywardData)
