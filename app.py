@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from datetime import date
 
 import pandas as pd
@@ -74,6 +75,8 @@ if __name__ == '__main__':
                     'ICCID', 'JoinType']
     skywardFilter = ['HR #']
 
+    nameFilter = ['MESL', 'BESL', 'SESL', 'MSL', 'HSL', 'ELCL', 'MS-']
+
     # print paths for debug
     print(f'Prime(wireless): {paths[0]}')
     print(f'Endpoint(Intune): {paths[1]}')
@@ -110,7 +113,6 @@ if __name__ == '__main__':
     activeComputers = pd.merge(primeData, intuneData,
                                on='MAC Address')
 
-    activeComputers = activeComputers.sort_values('Last check-in')
     activeComputers['Last Seen'] = pd.to_datetime(
         activeComputers['Last Seen'])
     activeComputers['Last check-in'] = pd.to_datetime(
@@ -119,12 +121,23 @@ if __name__ == '__main__':
     # rename skyward column for merge
     skywardData = skywardData.rename(
         columns={'Serial Number': 'Serial number'})
+    skywardData['Serial number'] = skywardData['Serial number'].str.rsplit(
+        ' ').str[-1]
 
     print('Join skyward data to AD/Prime exports via service tag ...')
     mergedData = pd.merge(activeComputers, skywardData,
                           on='Serial number', how='left')
 
+    for prefix in nameFilter:
+        print('Filtering out ' + prefix + ' machines...')
+        mergedData = mergedData[~mergedData['Device name']
+                                .str.contains(prefix, na=False)]
+        time.sleep(1)
+
     print('Exporting result...')
+
+    print(mergedData['Serial number'])
+
     # export data
     mergedData.to_excel(
         f'export_{date.today().strftime("%b-%d-%Y")}.xlsx', index=False)
